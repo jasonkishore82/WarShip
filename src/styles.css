@@ -1,3 +1,21 @@
+:root {
+  --font: -apple-system, BlinkMacSystemFont, 'SF Pro Text', 'SF Pro Display', 'Inter', 'Segoe UI Variable', 'Segoe UI', system-ui, sans-serif;
+  --label: rgba(255, 255, 255, 0.96);
+  --secondary: rgba(235, 235, 245, 0.6);
+  --tertiary: rgba(235, 235, 245, 0.3);
+  --hairline: rgba(255, 255, 255, 0.14);
+  --fill: rgba(120, 120, 128, 0.24);
+  --fill-strong: rgba(120, 120, 128, 0.36);
+  --material: rgba(28, 28, 32, 0.58);
+  --blue: #0a84ff;
+  --green: #30d158;
+  --red: #ff453a;
+  --yellow: #ffd60a;
+  --radius-lg: 22px;
+  --radius-md: 14px;
+  --ease: cubic-bezier(0.32, 0.72, 0, 1);
+}
+
 html,
 body,
 #root {
@@ -8,13 +26,803 @@ body,
   background: #0b1620;
 }
 
-.hint {
+body {
+  font-family: var(--font);
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+}
+
+/* ---------- HUD shell ---------- */
+
+.hud {
   position: fixed;
-  left: 16px;
-  right: 16px;
-  bottom: 16px;
-  font: 13px/1.4 system-ui, sans-serif;
-  color: rgba(255, 255, 255, 0.75);
-  text-shadow: 0 1px 3px rgba(0, 0, 0, 0.6);
+  inset: 0;
   pointer-events: none;
+  font: 14px/1.38 var(--font);
+  letter-spacing: -0.01em;
+  color: var(--label);
+}
+
+.hud button {
+  font-family: inherit;
+}
+
+.glass {
+  pointer-events: auto;
+  box-sizing: border-box;
+  background: var(--material);
+  -webkit-backdrop-filter: blur(30px) saturate(180%);
+  backdrop-filter: blur(30px) saturate(180%);
+  border: 0.5px solid var(--hairline);
+  box-shadow:
+    0 0 0 0.5px rgba(0, 0, 0, 0.25),
+    0 12px 40px rgba(0, 0, 0, 0.32),
+    inset 0 0.5px 0 rgba(255, 255, 255, 0.12);
+}
+
+.secondary {
+  color: var(--secondary);
+}
+
+.hud h1,
+.hud h2,
+.hud h3,
+.hud p {
+  margin: 0;
+}
+
+.hud svg {
+  width: 18px;
+  height: 18px;
+  fill: none;
+  stroke: currentColor;
+  stroke-width: 1.8;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+}
+
+/* ---------- buttons ---------- */
+
+.btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  height: 36px;
+  padding: 0 16px;
+  border: 0;
+  border-radius: 999px;
+  font-size: 15px;
+  font-weight: 600;
+  letter-spacing: -0.01em;
+  cursor: pointer;
+  transition:
+    transform 0.25s var(--ease),
+    background-color 0.2s ease;
+}
+
+.btn:active {
+  transform: scale(0.96);
+}
+
+.hud .btn svg {
+  width: 16px;
+  height: 16px;
+}
+
+.btn.primary {
+  background: var(--blue);
+  color: #fff;
+}
+
+.btn.primary:hover {
+  background: #2491ff;
+}
+
+.btn.secondary-btn {
+  background: var(--fill);
+  color: var(--label);
+}
+
+.btn.secondary-btn:hover {
+  background: var(--fill-strong);
+}
+
+.btn.plain {
+  background: transparent;
+  color: var(--blue);
+}
+
+.btn.wide {
+  width: 100%;
+  height: 44px;
+  font-size: 16px;
+}
+
+.icon-btn {
+  display: grid;
+  place-items: center;
+  width: 40px;
+  height: 40px;
+  border-radius: 50%;
+  border: 0;
+  color: var(--label);
+  cursor: pointer;
+  transition:
+    transform 0.25s var(--ease),
+    background-color 0.2s ease;
+}
+
+.icon-btn:active {
+  transform: scale(0.92);
+}
+
+.icon-btn.active {
+  background: rgba(10, 132, 255, 0.85);
+}
+
+.icon-btn.small {
+  width: 28px;
+  height: 28px;
+  background: var(--fill);
+  pointer-events: auto;
+}
+
+.hud .icon-btn.small svg {
+  width: 14px;
+  height: 14px;
+}
+
+.hud button:focus-visible,
+.hud input:focus-visible {
+  outline: 2px solid var(--blue);
+  outline-offset: 2px;
+}
+
+/* ---------- status island (top centre) ---------- */
+
+.island {
+  position: absolute;
+  top: 16px;
+  left: 50%;
+  transform: translateX(-50%);
+  width: min(440px, calc(100vw - 32px - 112px));
+  padding: 12px 18px 14px;
+  border-radius: var(--radius-lg);
+  animation: drop-in 0.6s var(--ease);
+}
+
+.island-top {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.island .dot {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: var(--secondary);
+  box-shadow: 0 0 0 4px rgba(255, 255, 255, 0.06);
+}
+
+.island.go .dot {
+  background: var(--green);
+  box-shadow: 0 0 0 4px rgba(48, 209, 88, 0.18);
+}
+
+.island.alert .dot {
+  background: var(--red);
+  box-shadow: 0 0 0 4px rgba(255, 69, 58, 0.2);
+  animation: blink 1s ease-in-out infinite alternate;
+}
+
+.island-label {
+  font-size: 13px;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  color: var(--secondary);
+}
+
+.island.go .island-label {
+  color: var(--green);
+}
+
+.island.alert .island-label {
+  color: var(--red);
+}
+
+.brand {
+  margin-left: auto;
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--tertiary);
+  letter-spacing: 0.02em;
+}
+
+.island-message {
+  margin-top: 6px;
+  font-size: 17px;
+  font-weight: 600;
+}
+
+.island-help {
+  margin-top: 2px;
+  font-size: 13px;
+  color: var(--secondary);
+}
+
+.island-actions {
+  display: flex;
+  gap: 8px;
+  margin-top: 12px;
+}
+
+.island-actions .btn {
+  flex: 1;
+}
+
+/* ---------- toolbar (top right) ---------- */
+
+.toolbar {
+  position: absolute;
+  top: 16px;
+  right: 16px;
+  display: flex;
+  gap: 8px;
+}
+
+/* ---------- cards ---------- */
+
+.card {
+  position: absolute;
+  border-radius: var(--radius-lg);
+  padding: 14px 16px;
+}
+
+.card-head {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 8px;
+  margin-bottom: 10px;
+}
+
+.card-head h2 {
+  font-size: 17px;
+  font-weight: 600;
+  letter-spacing: -0.02em;
+}
+
+.card-head p {
+  font-size: 12px;
+  margin-top: 1px;
+}
+
+.badge,
+.value {
+  font-size: 22px;
+  font-weight: 600;
+  letter-spacing: -0.02em;
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+}
+
+.badge span,
+.value span {
+  font-size: 13px;
+  color: var(--secondary);
+  font-weight: 500;
+}
+
+.card-foot {
+  margin-top: 8px;
+  font-size: 12px;
+}
+
+.divider {
+  height: 0.5px;
+  background: var(--hairline);
+  margin: 12px -16px 4px;
+}
+
+.row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  min-height: 38px;
+  font-size: 15px;
+}
+
+.footnote {
+  margin-top: 8px;
+  font-size: 12px;
+  color: var(--secondary);
+}
+
+/* Fleet cards */
+
+.fleet {
+  bottom: 16px;
+  width: 252px;
+}
+
+.fleet.left {
+  left: 16px;
+}
+
+.fleet.right {
+  right: 16px;
+}
+
+.ship-list {
+  list-style: none;
+  margin: 10px 0 0;
+  padding: 0;
+}
+
+.ship-list li {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 4px 0;
+  font-size: 13px;
+}
+
+.ship-list li + li {
+  border-top: 0.5px solid var(--hairline);
+}
+
+.ship-list li.sunk .ship-name {
+  color: var(--tertiary);
+  text-decoration: line-through;
+}
+
+.pips {
+  display: flex;
+  gap: 3px;
+}
+
+.pip {
+  width: 10px;
+  height: 10px;
+  border-radius: 3px;
+  background: var(--fill-strong);
+  transition: background-color 0.3s ease;
+}
+
+.pip.hit {
+  background: var(--red);
+}
+
+/* Hit map */
+
+.hitmap {
+  display: grid;
+  grid-template-columns: 14px repeat(8, 1fr);
+  gap: 2px;
+  max-width: 220px;
+  margin: 0 auto;
+}
+
+.chips {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px;
+  margin-top: 10px;
+}
+
+.chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 3px 8px;
+  border-radius: 999px;
+  background: var(--fill);
+  font-size: 11.5px;
+  font-weight: 500;
+}
+
+.chip small {
+  font-size: 10px;
+  color: var(--secondary);
+  font-variant-numeric: tabular-nums;
+}
+
+.chip.damaged {
+  background: rgba(255, 159, 10, 0.22);
+  color: #ffd08a;
+}
+
+.chip.sunk {
+  background: rgba(255, 69, 58, 0.2);
+  color: rgba(255, 140, 130, 0.9);
+  text-decoration: line-through;
+}
+
+.hm-row {
+  display: contents;
+}
+
+.hm-label {
+  font-size: 10px;
+  font-weight: 600;
+  color: var(--tertiary);
+  text-align: center;
+  line-height: 14px;
+  font-variant-numeric: tabular-nums;
+}
+
+.hm-row .hm-label {
+  align-self: center;
+}
+
+.hm-cell {
+  aspect-ratio: 1;
+  border-radius: 4px;
+  background: rgba(100, 170, 220, 0.12);
+  display: grid;
+  place-items: center;
+  transition: background-color 0.3s ease;
+}
+
+.hm-cell.target {
+  border: 0;
+  padding: 0;
+  cursor: crosshair;
+  pointer-events: auto;
+}
+
+.hitmap.armed .hm-cell.target:hover,
+.hitmap.armed .hm-cell.target:focus-visible {
+  background: rgba(255, 214, 10, 0.55);
+  box-shadow: 0 0 0 1.5px var(--yellow);
+  outline: none;
+}
+
+.fleet.right:has(.hitmap.armed) {
+  box-shadow:
+    0 0 0 1px rgba(48, 209, 88, 0.55),
+    0 12px 40px rgba(0, 0, 0, 0.32);
+}
+
+.hm-cell.ship {
+  background: rgba(174, 174, 178, 0.42);
+}
+
+.hm-cell.sunk {
+  background: rgba(255, 69, 58, 0.32);
+}
+
+.hm-cell.last {
+  box-shadow: 0 0 0 1.5px var(--yellow);
+  animation: ring 1.2s ease-in-out infinite alternate;
+}
+
+.hm-hit {
+  width: 58%;
+  height: 58%;
+  border-radius: 50%;
+  background: var(--red);
+  box-shadow: 0 0 6px rgba(255, 69, 58, 0.8);
+}
+
+.hm-miss {
+  width: 34%;
+  height: 34%;
+  border-radius: 50%;
+  background: rgba(255, 255, 255, 0.85);
+}
+
+/* Curtain card (right) */
+
+.curtain {
+  top: 72px;
+  right: 16px;
+  width: 252px;
+  animation: pop 0.3s var(--ease);
+  transform-origin: top right;
+}
+
+.stepper-row {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.slider {
+  flex: 1;
+  height: 4px;
+  -webkit-appearance: none;
+  appearance: none;
+  border-radius: 2px;
+  background: linear-gradient(to right, var(--blue) var(--p, 50%), var(--fill-strong) var(--p, 50%));
+  cursor: pointer;
+}
+
+.slider::-webkit-slider-thumb {
+  -webkit-appearance: none;
+  width: 22px;
+  height: 22px;
+  border-radius: 50%;
+  background: #fff;
+  box-shadow:
+    0 0.5px 4px rgba(0, 0, 0, 0.3),
+    0 3px 8px rgba(0, 0, 0, 0.15);
+}
+
+.slider::-moz-range-thumb {
+  width: 22px;
+  height: 22px;
+  border: 0;
+  border-radius: 50%;
+  background: #fff;
+  box-shadow: 0 0.5px 4px rgba(0, 0, 0, 0.3);
+}
+
+/* iOS switch */
+
+.switch-row {
+  cursor: pointer;
+}
+
+.switch {
+  position: relative;
+  width: 51px;
+  height: 31px;
+  padding: 0;
+  border: 0;
+  border-radius: 999px;
+  background: var(--fill-strong);
+  cursor: pointer;
+  transition: background-color 0.25s ease;
+  flex-shrink: 0;
+}
+
+.switch.on {
+  background: var(--green);
+}
+
+.switch .knob {
+  position: absolute;
+  top: 2px;
+  left: 2px;
+  width: 27px;
+  height: 27px;
+  border-radius: 50%;
+  background: #fff;
+  box-shadow:
+    0 3px 8px rgba(0, 0, 0, 0.15),
+    0 3px 1px rgba(0, 0, 0, 0.06);
+  transition: transform 0.3s var(--ease);
+}
+
+.switch.on .knob {
+  transform: translateX(20px);
+}
+
+/* ---------- alert + result sheet ---------- */
+
+.scrim {
+  position: absolute;
+  inset: 0;
+  display: grid;
+  place-items: center;
+  pointer-events: auto;
+  background: rgba(0, 0, 0, 0.32);
+  animation: fade 0.3s ease;
+}
+
+.alert {
+  width: 270px;
+  border-radius: var(--radius-md);
+  overflow: hidden;
+  text-align: center;
+  animation: pop 0.35s var(--ease);
+}
+
+.alert-body {
+  padding: 20px 16px 18px;
+}
+
+.alert-body h3 {
+  font-size: 17px;
+  font-weight: 600;
+}
+
+.alert-body p {
+  margin-top: 4px;
+  font-size: 13px;
+  color: var(--secondary);
+}
+
+.alert-actions {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  border-top: 0.5px solid var(--hairline);
+}
+
+.alert-actions button {
+  height: 44px;
+  border: 0;
+  background: transparent;
+  color: var(--blue);
+  font-size: 17px;
+  cursor: pointer;
+}
+
+.alert-actions button + button {
+  border-left: 0.5px solid var(--hairline);
+}
+
+.alert-actions button:hover {
+  background: rgba(255, 255, 255, 0.06);
+}
+
+.alert-actions .destructive {
+  color: var(--red);
+  font-weight: 600;
+}
+
+.sheet {
+  width: min(360px, calc(100vw - 32px));
+  border-radius: 28px;
+  padding: 28px 24px 18px;
+  text-align: center;
+  animation: pop 0.45s var(--ease);
+}
+
+.sheet-eyebrow {
+  font-size: 13px;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  color: var(--secondary);
+}
+
+.sheet h1 {
+  margin-top: 4px;
+  font-size: 44px;
+  font-weight: 700;
+  letter-spacing: -0.03em;
+}
+
+.sheet.player h1 {
+  background: linear-gradient(180deg, #ffffff, #7cf0a0);
+  -webkit-background-clip: text;
+  background-clip: text;
+  color: transparent;
+}
+
+.sheet.enemy h1 {
+  background: linear-gradient(180deg, #ffffff, #ff8a80);
+  -webkit-background-clip: text;
+  background-clip: text;
+  color: transparent;
+}
+
+.sheet > p {
+  margin-top: 4px;
+  font-size: 15px;
+}
+
+.sheet-stats {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  margin: 22px 0;
+  padding: 14px 0;
+  border-radius: var(--radius-md);
+  background: rgba(118, 118, 128, 0.18);
+}
+
+.sheet-stats div {
+  display: flex;
+  flex-direction: column;
+}
+
+.sheet-stats div + div {
+  border-left: 0.5px solid var(--hairline);
+}
+
+.sheet-stats b {
+  font-size: 24px;
+  font-weight: 600;
+  font-variant-numeric: tabular-nums;
+}
+
+.sheet-stats span {
+  font-size: 12px;
+  color: var(--secondary);
+}
+
+.sheet-actions {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+/* ---------- motion ---------- */
+
+@keyframes fade {
+  from {
+    opacity: 0;
+  }
+}
+
+@keyframes pop {
+  from {
+    opacity: 0;
+    transform: scale(1.12);
+  }
+}
+
+@keyframes drop-in {
+  from {
+    opacity: 0;
+    transform: translate(-50%, -12px);
+  }
+}
+
+@keyframes blink {
+  to {
+    opacity: 0.45;
+  }
+}
+
+@keyframes ring {
+  to {
+    box-shadow: 0 0 0 1.5px rgba(255, 214, 10, 0.25);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .hud *,
+  .hud *::before,
+  .hud *::after {
+    animation: none !important;
+    transition: none !important;
+  }
+}
+
+/* ---------- narrow screens ---------- */
+
+@media (max-width: 760px) {
+  .island {
+    left: 16px;
+    transform: none;
+    width: calc(100vw - 32px - 56px);
+    z-index: 1;
+    animation: none;
+  }
+  .toolbar {
+    flex-direction: column;
+  }
+  .fleet {
+    width: calc(50vw - 22px);
+    padding: 10px 12px;
+  }
+  .fleet.left {
+    left: 12px;
+  }
+  .fleet.right {
+    right: 12px;
+  }
+  .chips,
+  .card-foot,
+  .card-head p {
+    display: none;
+  }
+  .hitmap {
+    max-width: 170px;
+  }
+  .curtain {
+    top: 164px;
+    right: 12px;
+    transform: none;
+    width: 230px;
+  }
+  .curtain .footnote {
+    display: none;
+  }
 }
