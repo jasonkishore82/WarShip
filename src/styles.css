@@ -1,0 +1,19 @@
+html,
+body,
+#root {
+  margin: 0;
+  width: 100%;
+  height: 100%;
+  overflow: hidden;
+  background: #0b1620;
+}
+
+.hint {
+  position: fixed;
+  left: 16px;
+  bottom: 16px;
+  font: 13px/1.4 system-ui, sans-serif;
+  color: rgba(255, 255, 255, 0.75);
+  text-shadow: 0 1px 3px rgba(0, 0, 0, 0.6);
+  pointer-events: none;
+}
