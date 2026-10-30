@@ -4,6 +4,7 @@ import * as THREE from 'three'
 import { Sky } from 'three/examples/jsm/objects/Sky.js'
 import { WAVES, waveState } from './waves'
 import { oceanVertex, oceanFragment } from './oceanShader'
+import { GRID } from './grid'
 
 // Circular grid: dense near the centre, sparse toward the horizon.
 function createRadialGrid(rings = 360, segments = 512, a = 15, b = 0.019) {
@@ -34,7 +35,7 @@ function createRadialGrid(rings = 360, segments = 512, a = 15, b = 0.019) {
   return geo
 }
 
-export default function Ocean({ sunDir, chop, speed, foam, deepColor, scatterColor }) {
+export default function Ocean({ sunDir, chop, speed, foam, deepColor, scatterColor, gridOpacity = 1 }) {
   const gl = useThree((s) => s.gl)
   const scene = useThree((s) => s.scene)
 
@@ -78,7 +79,12 @@ export default function Ocean({ sunDir, chop, speed, foam, deepColor, scatterCol
           uDeep: { value: new THREE.Color() },
           uScatter: { value: new THREE.Color() },
           uFoam: { value: 0.8 },
+          uGrid: { value: new THREE.Vector3(GRID.size, GRID.cell, GRID.gap) },
+          uGridOpacity: { value: 1 },
+          uGridColor: { value: new THREE.Color('#bfeeff') },
+          uSepColor: { value: new THREE.Color('#ff9a3c') },
         },
+        extensions: { derivatives: true },
       }),
     [env]
   )
@@ -95,7 +101,8 @@ export default function Ocean({ sunDir, chop, speed, foam, deepColor, scatterCol
     material.uniforms.uDeep.value.set(deepColor)
     material.uniforms.uScatter.value.set(scatterColor)
     material.uniforms.uFoam.value = foam
-  }, [material, deepColor, scatterColor, foam])
+    material.uniforms.uGridOpacity.value = gridOpacity
+  }, [material, deepColor, scatterColor, foam, gridOpacity])
 
   useEffect(
     () => () => {

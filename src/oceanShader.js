@@ -60,6 +60,33 @@ varying vec3 vNormal;
 varying float vHeight;
 varying float vJacobian;
 
+uniform vec3 uGrid; // cells per side, cell size, gap from separator
+uniform float uGridOpacity;
+uniform vec3 uGridColor;
+uniform vec3 uSepColor;
+
+// Anti-aliased line strength for one 8x8 board starting at (x0, z0).
+float boardLines(vec2 p, vec2 origin) {
+  float n = uGrid.x;
+  vec2 g = (p - origin) / uGrid.y; // 0..n inside the board
+  vec2 fw = max(fwidth(g), vec2(1e-4));
+
+  // Inner lines (thin) and the outer border (thicker), in cell units.
+  vec2 halfW = max(vec2(0.025), fw * 0.75);
+  vec2 bW = max(vec2(0.06), fw * 1.25);
+  vec2 l = 1.0 - smoothstep(halfW, halfW + fw, abs(fract(g + 0.5) - 0.5));
+  vec2 edge = min(abs(g), abs(g - n));
+  vec2 b = 1.0 - smoothstep(bW, bW + fw, edge);
+
+  // Only draw within the board (plus the border's own width).
+  vec2 inside = smoothstep(-bW - fw, -bW, g) * (1.0 - smoothstep(n + bW, n + bW + fw, g));
+  float mask = inside.x * inside.y;
+
+  float lines = max(l.x, l.y) * 0.7;
+  float border = max(b.x, b.y);
+  return max(lines, border) * mask;
+}
+
 vec2 hash2(vec2 p) {
   p = vec2(dot(p, vec2(127.1, 311.7)), dot(p, vec2(269.5, 183.3)));
   return -1.0 + 2.0 * fract(sin(p) * 43758.5453123);
@@ -142,6 +169,23 @@ void main() {
   foam *= exp(-dist * 0.0015);
   vec3 foamCol = vec3(0.85, 0.9, 0.92) * (0.25 + 0.75 * sunUp) * wrap;
   color = mix(color, foamCol, clamp(foam, 0.0, 1.0) * 0.85);
+
+  // Imaginary 8x8 boards on either side of the separator, painted onto the waves.
+  float boardSize = uGrid.x * uGrid.y;
+  vec2 leftOrigin = vec2(-uGrid.z - boardSize, -boardSize * 0.5);
+  vec2 rightOrigin = vec2(uGrid.z, -boardSize * 0.5);
+  float grid = max(boardLines(p, leftOrigin), boardLines(p, rightOrigin));
+  // Subtle shimmer so the lines feel like light on the water, not paint.
+  grid *= 0.8 + 0.2 * sin(uTime * 1.5 + (p.x + p.y) * 0.05);
+  color += uGridColor * grid * uGridOpacity * (0.6 + 0.6 * sunUp);
+
+  // Separator: a glowing line along x = 0, spanning the boards.
+  float sepFw = max(fwidth(p.x), 1e-3);
+  float sepW = max(0.6, sepFw);
+  float sep = 1.0 - smoothstep(sepW, sepW + sepFw * 1.5, abs(p.x));
+  float sepGlow = exp(-abs(p.x) * 0.25) * 0.35;
+  float sepSpan = 1.0 - smoothstep(boardSize * 0.5 + 10.0, boardSize * 0.5 + 25.0, abs(p.y));
+  color += uSepColor * (sep + sepGlow) * sepSpan * uGridOpacity * 1.5;
 
   // Blend into the sky at the horizon.
   vec3 horizon = textureCube(uEnv, normalize(vec3(-V.x, 0.03, -V.z))).rgb;

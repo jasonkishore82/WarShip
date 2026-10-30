@@ -2,15 +2,18 @@ import { useMemo, useRef } from 'react'
 import { useFrame } from '@react-three/fiber'
 import * as THREE from 'three'
 import { waterHeight } from './waves'
+import { cellCenter } from './grid'
 
-const HEADING = 0.6
+// Sits in a cell on the left board, lined up with the grid.
+const POS = cellCenter('left', 4, 3)
+const HEADING = 0
 const HALF_LENGTH = 12
 const HALF_BEAM = 4
 
 function toWorld(lx, lz) {
   const c = Math.cos(HEADING)
   const s = Math.sin(HEADING)
-  return [lx * c + lz * s, -lx * s + lz * c]
+  return [POS[0] + lx * c + lz * s, POS[1] - lx * s + lz * c]
 }
 
 const SAMPLES = {
@@ -70,7 +73,7 @@ export default function Ship() {
     const hs = h(SAMPLES.stern)
     const hp = h(SAMPLES.port)
     const hsb = h(SAMPLES.starboard)
-    const hc = waterHeight(0, 0)
+    const hc = waterHeight(POS[0], POS[1])
 
     const targetY = (hb + hs + hp + hsb + hc * 2) / 6
     const targetPitch = Math.atan2(hb - hs, HALF_LENGTH * 2)
@@ -88,7 +91,7 @@ export default function Ship() {
   })
 
   return (
-    <group ref={yawRef} rotation={[0, HEADING, 0]}>
+    <group ref={yawRef} position={[POS[0], 0, POS[1]]} rotation={[0, HEADING, 0]}>
       <group ref={tiltRef}>
         <mesh geometry={hull}>
           <meshStandardMaterial attach="material-0" color="#6f747a" metalness={0.2} roughness={0.8} />

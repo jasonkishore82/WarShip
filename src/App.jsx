@@ -1,10 +1,11 @@
 import { useEffect, useMemo } from 'react'
 import { Canvas, useThree } from '@react-three/fiber'
 import { OrbitControls } from '@react-three/drei'
-import { useControls } from 'leva'
+import { Leva, useControls } from 'leva'
 import * as THREE from 'three'
 import Ocean from './Ocean'
 import Ship from './Ship'
+import Separator from './Separator'
 
 function Exposure({ value }) {
   const gl = useThree((s) => s.gl)
@@ -28,6 +29,9 @@ export default function App() {
     scatterColor: '#1f8f7f',
     ship: true,
   })
+  const { gridOpacity } = useControls('Grid', {
+    gridOpacity: { value: 0.6, min: 0, max: 1.5, step: 0.01, label: 'opacity' },
+  })
 
   const sunDir = useMemo(() => {
     const phi = THREE.MathUtils.degToRad(90 - elevation)
@@ -41,7 +45,7 @@ export default function App() {
     <>
       <Canvas
         dpr={[1, 2]}
-        camera={{ position: [45, 12, 55], fov: 50, near: 0.5, far: 30000 }}
+        camera={{ position: [0, 210, 560], fov: 50, near: 0.5, far: 30000 }}
         gl={{ antialias: true }}
       >
         <Exposure value={exposure} />
@@ -52,18 +56,21 @@ export default function App() {
           foam={foam}
           deepColor={deepColor}
           scatterColor={scatterColor}
+          gridOpacity={gridOpacity}
         />
+        <Separator />
         {ship && <Ship />}
         <directionalLight position={sunDir.clone().multiplyScalar(200)} intensity={sunLight} color="#ffe2c4" />
         <ambientLight intensity={0.15} />
         <OrbitControls
-          target={[0, 4, 0]}
+          target={[0, 0, 0]}
           enableDamping
           maxPolarAngle={1.47}
           minDistance={18}
-          maxDistance={600}
+          maxDistance={1400}
         />
       </Canvas>
+      <Leva collapsed />
       <div className="hint">Drag to orbit · scroll to zoom</div>
     </>
   )
