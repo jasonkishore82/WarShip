@@ -1,13 +1,14 @@
-import { useEffect, useMemo } from 'react'
+import { useCallback, useEffect, useMemo, useState } from 'react'
 import { Canvas, useFrame, useThree } from '@react-three/fiber'
 import { OrbitControls } from '@react-three/drei'
 import { Leva, useControls } from 'leva'
 import * as THREE from 'three'
 import Ocean from './Ocean'
 import Fleet from './Fleet'
-import Separator from './Separator'
+import Curtain, { DEFAULT_HEIGHT, MAX_HEIGHT, MIN_HEIGHT } from './Curtain'
 import { GRID } from './grid'
 import { waterHeight } from './waves'
+import { ENEMY_FLEET, FLEET } from './fleetConfig'
 
 function Exposure({ value }) {
   const gl = useThree((s) => s.gl)
@@ -61,6 +62,14 @@ export default function App() {
     gridOpacity: { value: 0.6, min: 0, max: 1.5, step: 0.01, label: 'opacity' },
   })
 
+  const [{ poleHeight }, setWall] = useControls('Wall', () => ({
+    poleHeight: { value: DEFAULT_HEIGHT, min: MIN_HEIGHT, max: MAX_HEIGHT, step: 1, label: 'pole height' },
+  }))
+  const setPoleHeight = useCallback((h) => setWall({ poleHeight: h }), [setWall])
+
+  const [ships, setShips] = useState(FLEET)
+  const [enemyShips, setEnemyShips] = useState(ENEMY_FLEET)
+
   const sunDir = useMemo(() => {
     const phi = THREE.MathUtils.degToRad(90 - elevation)
     const theta = THREE.MathUtils.degToRad(azimuth)
@@ -88,11 +97,13 @@ export default function App() {
           scatterColor={scatterColor}
           gridOpacity={gridOpacity}
         />
-        <Separator />
-        {fleet && <Fleet />}
+        <Curtain height={poleHeight} onHeightChange={setPoleHeight} />
+        {fleet && <Fleet side="left" ships={ships} onChange={setShips} />}
+        {fleet && <Fleet side="right" ships={enemyShips} onChange={setEnemyShips} />}
         <directionalLight position={sunDir.clone().multiplyScalar(200)} intensity={sunLight} color="#ffe2c4" />
         <ambientLight intensity={0.15} />
         <OrbitControls
+          makeDefault
           target={[0, 0, 0]}
           enableDamping
           maxPolarAngle={1.42}
@@ -101,7 +112,7 @@ export default function App() {
         />
       </Canvas>
       <Leva collapsed />
-      <div className="hint">Drag to orbit · scroll to zoom · click a ship to hit it</div>
+      <div className="hint">Drag a ship to move it · press R while dragging to rotate · click a ship to hit it · drag a gold pole top to resize the wall · drag the sea to orbit</div>
     </>
   )
 }

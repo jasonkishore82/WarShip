@@ -11,6 +11,7 @@ body,
 .hint {
   position: fixed;
   left: 16px;
+  right: 16px;
   bottom: 16px;
   font: 13px/1.4 system-ui, sans-serif;
   color: rgba(255, 255, 255, 0.75);

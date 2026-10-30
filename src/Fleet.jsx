@@ -1,8 +1,9 @@
-import { useMemo, useRef } from 'react'
-import { useFrame } from '@react-three/fiber'
+import { useEffect, useMemo, useRef, useState } from 'react'
+import { useFrame, useThree } from '@react-three/fiber'
 import * as THREE from 'three'
 import { waterHeight } from './waves'
-import { FLEET, shipTransform } from './fleetConfig'
+import { FLEET, SHIP_TYPES, cellAt, isValidPlacement, shipCells, shipTransform } from './fleetConfig'
+import { GRID, cellCenter } from './grid'
 
 // ---------- shared materials ----------
 const MAT = {
@@ -240,11 +241,9 @@ const MODELS = { carrier: Carrier, battleship: Battleship, cruiser: Cruiser, sub
 // ---------- buoyancy physics ----------
 //
 // Each ship is a rigid body that can heave (move up/down), pitch and roll.
-// It stays in its grid cell (x/z are fixed), but floats on a set of points
-// spread along its hull. Every point that is under water pushes up with a
-// force proportional to how deep it is (Archimedes), gravity pulls down,
-// and water drag damps the motion. The waves move the points, so the ship
-// is pushed around by the sea and carries momentum, overshoot and rocking.
+// It floats on a set of points spread along its hull. Every point that is
+// under water pushes up with a force proportional to how deep it is
+// (Archimedes), gravity pulls down, and water drag damps the motion.
 
 const PHYS = {
   carrier: { beam: 22, draft: 8, freeboard: 7 },
@@ -255,24 +254,19 @@ const PHYS = {
 }
 
 const STEP = 1 / 120 // fixed physics step (seconds)
+const LIFT = 10 // how high a ship floats while you hold it
 
-function useBuoyancy(ship, t) {
+function useBuoyancy(type, length) {
   return useMemo(() => {
-    const p = PHYS[ship.type]
-    const c = Math.cos(t.heading)
-    const s = Math.sin(t.heading)
+    const p = PHYS[type]
     const points = []
     const rows = 7
     for (let i = 0; i < rows; i++) {
-      const lx = (i / (rows - 1) - 0.5) * t.length * 0.88
-      for (const side of [-1, 1]) {
-        const lz = (side * p.beam) / 2
-        points.push({ lx, lz, wx: t.x + lx * c + lz * s, wz: t.z - lx * s + lz * c })
-      }
+      const lx = (i / (rows - 1) - 0.5) * length * 0.88
+      for (const side of [-1, 1]) points.push({ lx, lz: (side * p.beam) / 2 })
     }
     // Natural heave period grows with ship size (small boats bob faster).
-    const period = 3 + t.length / 40
-    const omega = (2 * Math.PI) / period
+    const omega = (2 * Math.PI) / (3 + length / 40)
     const mean = (f) => points.reduce((a, q) => a + f(q), 0) / points.length
     return {
       ...p,
@@ -282,28 +276,48 @@ function useBuoyancy(ship, t) {
       pitchInertia: mean((q) => q.lx * q.lx),
       // Ships are tall and narrow, so they roll slower and more freely than they pitch.
       rollInertia: mean((q) => q.lz * q.lz) * 2.5,
-      heading: t.heading,
     }
-  }, [ship.type, t])
+  }, [type, length])
 }
 
-function FloatingShip({ ship }) {
-  const t = useMemo(() => shipTransform(ship), [ship])
-  const body = useBuoyancy(ship, t)
+// Shortest signed angle from a to b.
+function angleDelta(a, b) {
+  return Math.atan2(Math.sin(b - a), Math.cos(b - a))
+}
+
+function FloatingShip({ ship, side, held, hitters, onGrab }) {
+  const t = useMemo(() => shipTransform(ship, side), [ship, side])
+  const body = useBuoyancy(ship.type, t.length)
   const posRef = useRef()
   const tiltRef = useRef()
-  const state = useRef({ y: 2, vy: 0, pitch: 0, vp: 0, roll: 0, vr: 0, acc: 0 })
+  const state = useRef({
+    x: t.x, z: t.z, heading: t.heading, lift: 0,
+    y: 2, vy: 0, pitch: 0, vp: 0, roll: 0, vr: 0, acc: 0,
+  })
   const heights = useMemo(() => new Float32Array(body.points.length), [body])
 
   useFrame((_, delta) => {
     const st = state.current
+    const dt = Math.min(delta, 0.1)
+
+    // Glide toward the target cells / heading, and lift while held.
+    const glide = 1 - Math.exp(-dt * 8)
+    st.x += (t.x - st.x) * glide
+    st.z += (t.z - st.z) * glide
+    st.heading += angleDelta(st.heading, t.heading) * glide
+    st.lift += ((held ? LIFT : 0) - st.lift) * (1 - Math.exp(-dt * 6))
+
+    // Water under each hull point at the ship's current position.
     const { points, stiffness: k, omega, draft, freeboard } = body
     const n = points.length
+    const c = Math.cos(st.heading)
+    const s = Math.sin(st.heading)
+    for (let i = 0; i < n; i++) {
+      const q = points[i]
+      heights[i] = waterHeight(st.x + q.lx * c + q.lz * s, st.z - q.lx * s + q.lz * c)
+    }
 
-    // Water under each hull point (waves change slowly next to the physics step).
-    for (let i = 0; i < n; i++) heights[i] = waterHeight(points[i].wx, points[i].wz)
-
-    st.acc += Math.min(delta, 0.1)
+    st.acc += dt
     while (st.acc >= STEP) {
       st.acc -= STEP
       const sp = Math.sin(st.pitch)
@@ -328,8 +342,7 @@ function FloatingShip({ ship }) {
       // Gravity balances buoyancy when the hull sits at its draft in calm water.
       const ay = force - k * draft - 2 * 0.35 * omega * st.vy
       const ap = pitchTorque / body.pitchInertia - 2 * 0.4 * omega * st.vp
-      const rollOmega = omega / Math.sqrt(2.5)
-      const ar = rollTorque / body.rollInertia - 2 * 0.12 * rollOmega * st.vr
+      const ar = rollTorque / body.rollInertia - 2 * 0.12 * (omega / Math.sqrt(2.5)) * st.vr
 
       st.vy += ay * STEP
       st.vp += ap * STEP
@@ -339,18 +352,18 @@ function FloatingShip({ ship }) {
       st.roll += st.vr * STEP
     }
 
-    posRef.current.position.y = st.y + 0.5
+    posRef.current.position.set(st.x, st.y + 0.5 + st.lift, st.z)
+    posRef.current.rotation.set(0, st.heading, 0)
     tiltRef.current.rotation.set(st.roll, 0, st.pitch)
   })
 
-  // Clicking a ship hits it: a downward impulse at the hit point makes it lurch and rock.
-  const onHit = (e) => {
-    e.stopPropagation()
+  // A hit: a downward impulse at the hit point makes the ship lurch and rock.
+  hitters.current[ship.type] = (point) => {
     const st = state.current
-    const dx = e.point.x - t.x
-    const dz = e.point.z - t.z
-    const c = Math.cos(body.heading)
-    const s = Math.sin(body.heading)
+    const dx = point.x - st.x
+    const dz = point.z - st.z
+    const c = Math.cos(st.heading)
+    const s = Math.sin(st.heading)
     const lx = dx * c - dz * s
     const lz = dx * s + dz * c
     const strength = 4 * Math.sqrt(74 / t.length) // smaller ships get knocked harder
@@ -361,11 +374,11 @@ function FloatingShip({ ship }) {
 
   const Model = MODELS[ship.type]
   return (
-    <group ref={posRef} position={[t.x, 0, t.z]} rotation={[0, t.heading, 0]}>
+    <group ref={posRef}>
       <group
         ref={tiltRef}
-        onClick={onHit}
-        onPointerOver={() => (document.body.style.cursor = 'crosshair')}
+        onPointerDown={(e) => onGrab(ship, e)}
+        onPointerOver={() => (document.body.style.cursor = 'grab')}
         onPointerOut={() => (document.body.style.cursor = '')}
       >
         <Model length={t.length} />
@@ -374,6 +387,135 @@ function FloatingShip({ ship }) {
   )
 }
 
-export default function Fleet({ ships = FLEET }) {
-  return ships.map((ship) => <FloatingShip key={ship.type} ship={ship} />)
+// Glowing tiles under the cells a held ship would occupy.
+const tileGeo = new THREE.PlaneGeometry(GRID.cell * 0.92, GRID.cell * 0.92).rotateX(-Math.PI / 2)
+const tileMat = {
+  ok: new THREE.MeshBasicMaterial({ color: '#3dff8b', transparent: true, opacity: 0.35, depthTest: false, depthWrite: false }),
+  bad: new THREE.MeshBasicMaterial({ color: '#ff3d3d', transparent: true, opacity: 0.4, depthTest: false, depthWrite: false }),
+}
+
+function PlacementTiles({ ship, side, valid }) {
+  return shipCells(ship).map(([c, r]) => {
+    const [x, z] = cellCenter(side, c, r)
+    return (
+      <mesh
+        key={`${c},${r}`}
+        geometry={tileGeo}
+        material={valid ? tileMat.ok : tileMat.bad}
+        position={[x, 1, z]}
+        renderOrder={10}
+      />
+    )
+  })
+}
+
+// ---------- fleet + drag-and-drop placement ----------
+
+const groundPlane = new THREE.Plane(new THREE.Vector3(0, 1, 0), 0)
+
+export default function Fleet({ ships = FLEET, side = 'left', onChange }) {
+  const { camera, gl, raycaster, controls } = useThree()
+  const hitters = useRef({})
+  const [drag, setDrag] = useState(null)
+  const dragRef = useRef(null)
+  dragRef.current = drag
+
+  const onGrab = (ship, e) => {
+    if (e.button !== 0) return
+    e.stopPropagation()
+    const [c, r] = cellAt(e.point.x, e.point.z, side)
+    const size = SHIP_TYPES[ship.type].size
+    const along = ship.dir === 'h' ? c - ship.col : r - ship.row
+    setDrag({
+      type: ship.type,
+      grab: Math.min(Math.max(along, 0), size - 1), // which cell of the ship you're holding
+      cell: [c, r],
+      preview: { ...ship },
+      hitPoint: e.point.clone(),
+      startX: e.clientX,
+      startY: e.clientY,
+      moved: false,
+    })
+    if (controls) controls.enabled = false
+    document.body.style.cursor = 'grabbing'
+  }
+
+  const dragging = drag !== null
+
+  useEffect(() => {
+    if (!dragging) return undefined
+    const el = gl.domElement
+    const ndc = new THREE.Vector2()
+    const hit = new THREE.Vector3()
+
+    // Place the ship so the grabbed cell sits under the pointer.
+    const anchor = (d, [c, r], dir) =>
+      dir === 'h'
+        ? { ...d.preview, dir, col: c - d.grab, row: r }
+        : { ...d.preview, dir, col: c, row: r - d.grab }
+
+    const onMove = (e) => {
+      const d = dragRef.current
+      if (!d) return
+      const moved = d.moved || Math.hypot(e.clientX - d.startX, e.clientY - d.startY) > 5
+      if (!moved) return
+      const rect = el.getBoundingClientRect()
+      ndc.set(((e.clientX - rect.left) / rect.width) * 2 - 1, -((e.clientY - rect.top) / rect.height) * 2 + 1)
+      raycaster.setFromCamera(ndc, camera)
+      if (!raycaster.ray.intersectPlane(groundPlane, hit)) return
+      const cell = cellAt(hit.x, hit.z, side)
+      setDrag({ ...d, moved, cell, preview: anchor(d, cell, d.preview.dir) })
+    }
+
+    const onKey = (e) => {
+      const d = dragRef.current
+      if (!d || e.key.toLowerCase() !== 'r') return
+      const dir = d.preview.dir === 'h' ? 'v' : 'h'
+      setDrag({ ...d, moved: true, preview: anchor(d, d.cell, dir) })
+    }
+
+    const onUp = () => {
+      const d = dragRef.current
+      if (d) {
+        if (!d.moved) {
+          hitters.current[d.type]?.(d.hitPoint) // a plain click is a hit
+        } else if (isValidPlacement(d.preview, ships)) {
+          onChange?.(ships.map((s) => (s.type === d.type ? d.preview : s)))
+        }
+      }
+      setDrag(null)
+      if (controls) controls.enabled = true
+      document.body.style.cursor = ''
+    }
+
+    window.addEventListener('pointermove', onMove)
+    window.addEventListener('pointerup', onUp)
+    window.addEventListener('keydown', onKey)
+    return () => {
+      window.removeEventListener('pointermove', onMove)
+      window.removeEventListener('pointerup', onUp)
+      window.removeEventListener('keydown', onKey)
+    }
+  }, [dragging, ships, side, onChange, controls, camera, gl, raycaster])
+
+  const valid = drag ? isValidPlacement(drag.preview, ships) : true
+
+  return (
+    <>
+      {ships.map((ship) => {
+        const isHeld = drag?.type === ship.type && drag.moved
+        return (
+          <FloatingShip
+            key={ship.type}
+            ship={isHeld ? drag.preview : ship}
+            side={side}
+            held={isHeld}
+            hitters={hitters}
+            onGrab={onGrab}
+          />
+        )
+      })}
+      {drag?.moved && <PlacementTiles ship={drag.preview} side={side} valid={valid} />}
+    </>
+  )
 }
