@@ -68,6 +68,7 @@ export default function Ocean({ sunDir, chop, speed, foam, deepColor, scatterCol
       new THREE.ShaderMaterial({
         vertexShader: oceanVertex,
         fragmentShader: oceanFragment,
+        side: THREE.DoubleSide,
         uniforms: {
           uTime: { value: 0 },
           uChop: { value: 1 },

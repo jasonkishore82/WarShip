@@ -126,6 +126,21 @@ void main() {
   vec3 V = toCam / dist;
   vec3 L = normalize(uSunDir);
 
+  // Seen from below (camera dips under a wave, or looking under a crest):
+  // dark blue-green water, with the bright sky only visible straight up (Snell's window).
+  if (!gl_FrontFacing) {
+    vec3 look = -V; // camera -> surface
+    float window = smoothstep(0.55, 0.85, look.y);
+    vec3 deep = uDeep * 0.5 + uScatter * 0.06;
+    vec3 sky = textureCube(uEnv, normalize(vec3(look.x, look.y + 0.3, look.z))).rgb * 0.5;
+    vec3 under = mix(deep, sky, window);
+    under = mix(under, uDeep * 0.35, 1.0 - exp(-dist * 0.015));
+    gl_FragColor = vec4(under, 1.0);
+    #include <tonemapping_fragment>
+    #include <colorspace_fragment>
+    return;
+  }
+
   // Detail normal from ripples, faded with distance.
   vec2 p = vWorldPos.xz;
   float e = 0.1;
